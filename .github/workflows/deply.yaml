@@ -26,18 +26,24 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:${{ github.sha }}
 
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            docker pull ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
-            docker stop travel-planner || true
-            docker rm travel-planner || true
-            docker run -d \
-              --name travel-planner \
-              --restart always \
-              -p 8000:8000 \
-              --env-file /home/ubuntu/.env \
-              ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          echo "$SSH_KEY" > /tmp/ec2_key.pem
+          chmod 400 /tmp/ec2_key.pem
+
+          ssh -i /tmp/ec2_key.pem \
+            -o StrictHostKeyChecking=no \
+            ubuntu@${{ secrets.EC2_HOST }} << 'ENDSSH'
+              docker pull ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+              docker stop travel-planner || true
+              docker rm travel-planner || true
+              docker run -d \
+                --name travel-planner \
+                --restart always \
+                -p 8000:8000 \
+                --env-file /home/ubuntu/.env \
+                ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+          ENDSSH
+
+          rm /tmp/ec2_key.pem
