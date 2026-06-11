@@ -3,5 +3,12 @@ langchain
 langchain-groq
 langchain-core
 langchain-community
+langchain-google-community
 python-dotenv
-tavily
+pydantic
+uvicorn
+langchain-tavily
+httpx
+requests
+fastapi
+pandas
