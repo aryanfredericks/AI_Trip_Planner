@@ -19,15 +19,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+graph = GraphBuilder()
+react_app = graph()
+
 class QueryRequest(BaseModel):
     question: str
 
 @app.post("/query")
 async def query_travel_agent(query: QueryRequest):
     try:
-        graph = GraphBuilder(model_provider="groq")
-        react_app = graph()
-
         messages = {"messages": [query.question]}
         output = react_app.invoke(messages)
 

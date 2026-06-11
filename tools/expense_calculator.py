@@ -2,7 +2,7 @@ from utils.calculate_expenses import ExpenseCalculator
 from typing import List
 from langchain.tools import tool
 
-class CalculatorTool:
+class ExpenseCalculatorTool:
     def __init__(self):
         self.calculator = ExpenseCalculator()
         self.calculator_tool_list = self._setup_tools()

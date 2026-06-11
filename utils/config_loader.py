@@ -2,6 +2,8 @@ import yaml
 from pathlib import Path
 from dataclasses import dataclass
 
+_DEFAULT_CONFIG_PATH = str(Path(__file__).parent.parent / "configs" / "config.yaml")
+
 @dataclass
 class LLMConfig:
     provider: str
@@ -10,7 +12,7 @@ class LLMConfig:
 class ConfigLoader:
     """Class used to load a config file
     """
-    def __init__(self, config_path: str = "../configs/config.yaml"):
+    def __init__(self, config_path: str = _DEFAULT_CONFIG_PATH):
         self._config = self._load(config_path)
         self.provider = self._config["provider"]
         self.model_name = self._config["model_name"]

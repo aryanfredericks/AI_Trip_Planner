@@ -17,12 +17,18 @@ class GraphBuilder():
         self.graph = None
         self.llm_with_tools = None
         
-        self.tools.extend([
-            *WeatherInfoTool().get_tools(),
-            *PlaceSearchTool().get_tools(),
-            *ExpenseCalculatorTool().get_tools(),
-            *CurrencyConversionTool().get_tools()
-        ])
+        tool_sources = [
+            WeatherInfoTool().get_tools(),
+            PlaceSearchTool().get_tools(),
+            ExpenseCalculatorTool().get_tools(),
+            CurrencyConversionTool().get_tools(),
+        ]
+
+        for source in tool_sources:
+            if source is not None:
+                self.tools.extend(source)
+            else:
+                print(f"Warning: a tool source returned None — check API keys and init")
     
     def agent_function(self, state : MessagesState) -> MessagesState:
         """The LLM Agent Function
@@ -54,7 +60,7 @@ class GraphBuilder():
         return self.graph
     
     def __call__(self):
-        self.model_loader = ModelLoader()
+        self.model_loader = ModelLoader.from_config()
         llm = self.model_loader.load_llm()
         self.llm_with_tools = llm.bind_tools(self.tools)
         return self.build_graph()

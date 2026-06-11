@@ -1,6 +1,6 @@
 from pydantic import BaseModel,Field
 from typing import Literal,Optional
-from config_loader import ConfigLoader
+from utils.config_loader import ConfigLoader,_DEFAULT_CONFIG_PATH
 
 from langchain_groq import ChatGroq
 
@@ -14,7 +14,7 @@ class ModelLoader(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     
     @classmethod
-    def from_config(cls, config_path: str = "../configs/config.yaml") -> "ModelLoader":
+    def from_config(cls, config_path: str = _DEFAULT_CONFIG_PATH) -> "ModelLoader":
         config = ConfigLoader(config_path)
         return cls(model_provider=config.provider, config=config)
     
