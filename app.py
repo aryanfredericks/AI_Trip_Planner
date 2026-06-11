@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from agent.agent_workflow import GraphBuilder
 from utils.supabase_client import get_supabase
 from pydantic import BaseModel
@@ -23,15 +24,34 @@ app.add_middleware(
 graph = GraphBuilder()
 react_app = graph()
 
+bearer = HTTPBearer()
+
+
+# ── Auth dependency ────────────────────────────────────────────────────────
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer)
+):
+    """Validates the Supabase JWT sent from Flutter and returns the user ID."""
+    token = credentials.credentials
+    supabase = get_supabase()
+    try:
+        response = supabase.auth.get_user(token)
+        if not response or not response.user:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return response.user.id   # returns the Supabase user UUID
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
 
 class QueryRequest(BaseModel):
     question: str
 
 
+# ── Endpoints ──────────────────────────────────────────────────────────────
 @app.post("/query")
 async def query_travel_agent(
     query: QueryRequest,
-    x_user_id: str = Header(..., description="Device or user ID from Flutter")
+    user_id: str = Depends(get_current_user)   # ✅ replaces x_user_id header
 ):
     try:
         output = react_app.invoke({"messages": [query.question]})
@@ -41,26 +61,24 @@ async def query_travel_agent(
             else str(output)
         )
 
-        # Generate filename
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         filename = f"AI_Trip_Planner_{timestamp}.md"
-        storage_path = f"{x_user_id}/{filename}"
+        storage_path = f"{user_id}/{filename}"
 
         supabase = get_supabase()
 
-        # Upload .md file to Supabase Storage
         supabase.storage.from_("travel-plans").upload(
             path=storage_path,
             file=final_output.encode("utf-8"),
             file_options={"content-type": "text/markdown"},
         )
 
-        # Save metadata to database
         supabase.table("travel_plans").insert({
-            "user_id": x_user_id,
+            "user_id": user_id,
             "question": query.question,
             "answer": final_output,
             "filename": filename,
+            "storage_path": storage_path,
         }).execute()
 
         return {
@@ -74,14 +92,12 @@ async def query_travel_agent(
 
 
 @app.get("/history")
-async def list_documents(
-    x_user_id: str = Header(..., description="Device or user ID from Flutter")
-):
+async def list_documents(user_id: str = Depends(get_current_user)):
     supabase = get_supabase()
     result = (
         supabase.table("travel_plans")
         .select("id, question, filename, created_at")
-        .eq("user_id", x_user_id)
+        .eq("user_id", user_id)
         .order("created_at", desc=True)
         .execute()
     )
@@ -101,10 +117,10 @@ async def list_documents(
 @app.get("/download/{filename}")
 async def download_document(
     filename: str,
-    x_user_id: str = Header(..., description="Device or user ID from Flutter")
+    user_id: str = Depends(get_current_user)
 ):
     supabase = get_supabase()
-    storage_path = f"{x_user_id}/{filename}"
+    storage_path = f"{user_id}/{filename}"
     try:
         file_bytes = supabase.storage.from_("travel-plans").download(storage_path)
         return Response(
