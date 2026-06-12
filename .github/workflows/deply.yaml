@@ -25,25 +25,53 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
             ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:${{ github.sha }}
 
+      # - name: Deploy to EC2
+      #   env:
+      #     SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      #   run: |
+      #     echo "$SSH_KEY" > /tmp/ec2_key.pem
+      #     chmod 400 /tmp/ec2_key.pem
+
+      #     ssh -i /tmp/ec2_key.pem \
+      #       -o StrictHostKeyChecking=no \
+      #       ubuntu@${{ secrets.EC2_HOST }} << 'ENDSSH'
+      #         docker pull ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+      #         docker stop travel-planner || true
+      #         docker rm travel-planner || true
+      #         docker run -d \
+      #           --name travel-planner \
+      #           --restart always \
+      #           -p 8000:8000 \
+      #           --env-file /home/ubuntu/.env \
+      #           ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+      #     ENDSSH
+
+      #     rm /tmp/ec2_key.pem
       - name: Deploy to EC2
         env:
           SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
           echo "$SSH_KEY" > /tmp/ec2_key.pem
-          chmod 400 /tmp/ec2_key.pem
+          chmod 600 /tmp/ec2_key.pem
 
-          ssh -i /tmp/ec2_key.pem \
-            -o StrictHostKeyChecking=no \
-            ubuntu@${{ secrets.EC2_HOST }} << 'ENDSSH'
-              docker pull ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
-              docker stop travel-planner || true
-              docker rm travel-planner || true
-              docker run -d \
-                --name travel-planner \
-                --restart always \
-                -p 8000:8000 \
-                --env-file /home/ubuntu/.env \
-                ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
-          ENDSSH
+          ssh -o BatchMode=yes \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=10 \
+              -i /tmp/ec2_key.pem \
+              ubuntu@${{ secrets.EC2_HOST }} "
+                set -e
 
-          rm /tmp/ec2_key.pem
+                docker pull ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+
+                docker stop travel-planner || true
+                docker rm travel-planner || true
+
+                docker run -d \
+                  --name travel-planner \
+                  --restart always \
+                  -p 8000:8000 \
+                  --env-file /home/ubuntu/.env \
+                  ${{ secrets.DOCKER_USERNAME }}/ai-trip-planner:latest
+              "
+
+          rm -f /tmp/ec2_key.pem
